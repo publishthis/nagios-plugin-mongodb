@@ -16,6 +16,7 @@
 #   - @jbraeuer on github
 #   - Dag Stockstad <dag.stockstad@gmail.com>
 #   - @Andor on github
+#   - @publishthis on github
 #
 # USAGE
 #
@@ -122,7 +123,7 @@ def main(argv):
                  choices=['connect', 'connections', 'replication_lag', 'replication_lag_percent', 'replset_state', 'memory', 'memory_mapped', 'lock', 
                           'flushing', 'last_flush_time', 'index_miss_ratio', 'databases', 'collections', 'database_size','queues','oplog','journal_commits_in_wl',
                           'write_data_files','journaled','opcounters','current_lock','replica_primary','page_faults','asserts', 'queries_per_second',
-                          'page_faults', 'chunks_balance', 'connect_primary', 'collection_state'])
+                          'page_faults', 'chunks_balance', 'connect_primary', 'collection_state', 'unused_space'])
     p.add_option('--max-lag',action='store_true',dest='max_lag',default=False,help='Get max replication lag (for replication_lag action only)')
     p.add_option('--mapped-memory',action='store_true',dest='mapped_memory',default=False,help='Get mapped memory instead of resident (if resident memory can not be read)')
     p.add_option('-D', '--perf-data', action='store_true', dest='perf_data', default=False, help='Enable output of Nagios performance data')
@@ -209,6 +210,11 @@ def main(argv):
             return check_all_databases_size(con,warning, critical, perf_data)
         else:
             return check_database_size(con, database, warning, critical, perf_data)
+    elif action == "unused_space":
+        if options.all_databases:
+            return check_all_databases_unused_space(con, warning, critical, perf_data)
+        else:
+            return check_database_unused_space(con, database, warning, critical, perf_data)
     elif action == "journaled":
         return check_journaled(con, warning, critical,perf_data)
     elif action == "write_data_files":
@@ -755,6 +761,60 @@ def check_database_size(con, database, warning, critical, perf_data):
             return 0
     except Exception, e:
         return exit_with_general_critical(e)
+
+def check_all_databases_unused_space(con, warning, critical, perf_data):
+    warning = warning or 50*1000
+    critical = critical or 100*1000
+    try:
+        unused = sum([db_unused_space(con, db) for db in con.database_names()])
+        return report_unused_space(
+                unused, "(All databases)", warning, critical, perf_data)
+    except Exception as e:
+        return exit_with_general_critical(e)
+
+def check_database_unused_space(con, database, warning, critical, perf_data):
+    warning = warning or 10000
+    critical = critical or 100000
+    try:
+        unused_space = db_unused_space(con, database)
+        return report_unused_space(
+                unused_space, database, warning, critical, perf_data)
+    except Exception as e:
+        return exit_with_general_critical(e)
+
+def report_unused_space(unused_space, database, warning, critical, perf_data):
+    if perf_data:
+        perfdata = (" | unused_space={unused_space};{warning};{critical} database={database}"
+                    .format(**locals()))
+    else:
+        perfdata = ""
+
+    if unused_space >= critical:
+        status = "CRITICAL"
+        errcode = 2
+    elif unused_space >= warning:
+        status = "WARNING"
+        errcode = 1
+    else:
+        status = "OK"
+        errcode = 0
+
+    msg = "{status} - Unused space: {unused_space} MB, Database: {database}{perfdata}"
+    print msg.format(**locals())
+    return errcode
+
+def db_unused_space(con, database):
+    """Amount of unused storage in MB. """
+
+    set_read_preference(con.admin)
+    data = con[database].command('dbstats')
+    MB = 1024 * 1024
+
+    allocated_size = data['fileSize'] / MB
+    used_size = (data['dataSize'] + data['indexSize']) / MB
+    unused_space = allocated_size - used_size
+
+    return unused_space
 
 def check_queues(con, warning, critical, perf_data):
     warning = warning or 10
