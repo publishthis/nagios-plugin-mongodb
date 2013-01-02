@@ -232,6 +232,22 @@ define service {
 
 
 
+#### Check size of unused space of a database
+This will check the size of allocated but unused space. This might be used as
+indirect fragmentation meter in insert-delete heavy environments. As unused
+space grows, you may want to compact the database.
+Replace your-database with the name of your database
+<pre><code>
+define service {
+      use                     generic-service
+      hostgroup_name          Mongo Servers
+      service_description     MongoDB unused space size your-database
+      check_command           check_mongodb_database!unused_space!27017!50!100!your-database
+}
+</code></pre>
+
+
+
 #### Check the primary server of replicaset
 This will check the primary server of a replicaset. This is useful for catching unexpected stepdowns of the replica's primary server.
 Replace your-replicaset with the name of your replicaset
