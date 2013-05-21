@@ -1076,12 +1076,12 @@ def check_asserts(con, host, warning, critical,perf_data):
         regular_ps=delta[1]/delta[0]
         warning_ps=delta[2]/delta[0]
         msg_ps=delta[3]/delta[0]
-        user_ps=delta[4]/delta[0]
+        user_ps=delta[4]/delta[0]   # user asserts are unused
         rollovers_ps=delta[5]/delta[0]
-        total_ps=regular_ps+warning_ps+msg_ps+user_ps
+        total_ps=regular_ps+warning_ps+msg_ps
         message = "Total asserts : %.2f ps" % total_ps 
         message+=performance_data(perf_data,[(total_ps,"asserts_ps",warning,critical),(regular_ps,"regular"),
-                    (warning_ps,"warning"),(msg_ps,"msg"),(user_ps,"user")])
+                    (warning_ps,"warning"),(msg_ps,"msg")])
         return check_levels(total_ps,warning,critical,message)
     else:
         return exit_with_general_warning("problem reading data from temp file")
